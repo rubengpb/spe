@@ -1,19 +1,19 @@
 defmodule SPE.JobManager do
   use GenServer
 
-  def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: opts[:name])
+  def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
 
   def get_results(pid), do: GenServer.call(pid, :results)
+  def get_tasks(pid), do: GenServer.call(pid, :tasks)
 
   def throw_one(pid), do: send(pid, :throw_one)
 
   @impl true
   def init(opts) do
-    tasks = Enum.map(opts["tasks"], &normalize_task/1)
+    tasks = normalize_tasks(opts["tasks"])
     server_pid = opts["server_pid"]
 
     {ready, blocked} = split_ready(tasks, %{})
-
     Enum.each(ready, fn _ -> send(server_pid, {:there_is_worker, self()}) end)
 
     state = %{
@@ -33,7 +33,7 @@ defmodule SPE.JobManager do
   def handle_info(:throw_one, state) do
     [task | rest] = state["queued"]
 
-    input = build_input(task, state["results"])
+    input = state["results"]
 
     {:ok, _pid} =
       SPE.TaskWorker.start_link(
@@ -46,7 +46,7 @@ defmodule SPE.JobManager do
 
     new_state =
       state
-      |> Map.put(:queued, rest)
+      |> Map.put("queued", rest)
       |> Map.update!("running", &MapSet.put(&1, task["name"]))
 
     {:noreply, new_state}
@@ -77,19 +77,27 @@ defmodule SPE.JobManager do
     {:reply, state["results"], state}
   end
 
-  defp normalize_task(task),
-    do: Map.put_new(task, "deps", [])
+  def handle_call(:tasks, _from, state) do
+    {:reply, state["tasks"], state}
+  end
+
+  defp normalize_tasks(tasks) do
+    Enum.map(tasks, fn task ->
+      deps =
+        tasks
+        |> Enum.filter(fn x -> task["name"] in x["enable"] end)
+        |> Enum.map(& &1["name"])
+
+      Map.put(task, "deps", deps)
+    end)
+  end
 
   defp add_result(state, name, result) do
     %{
       state
-      | running: MapSet.delete(state["running"], name),
-        results: Map.put(state["results"], name, result)
+      | "running" => MapSet.delete(state["running"], name),
+        "results" => Map.put(state["results"], name, result)
     }
-  end
-
-  defp build_input(task, results) do
-    Enum.into(task["deps"], %{}, fn dep -> {dep, results[dep]} end)
   end
 
   defp split_ready(tasks, results) do
@@ -111,7 +119,7 @@ defmodule SPE.JobManager do
 
     Enum.each(new_ready, fn _ -> send(state["server_pid"], {:there_is_worker, self()}) end)
 
-    %{state | queued: state["queued"] ++ new_ready, blocked: still_blocked}
+    %{state | "queued" => state["queued"] ++ new_ready, "blocked" => still_blocked}
   end
 
   defp discard_dependents_failures(state) do
