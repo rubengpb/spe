@@ -5,7 +5,7 @@ defmodule SPE.JobManager do
 
   def get_results(pid), do: GenServer.call(pid, :results)
 
-  def throw_one(pid), do: GenServer.cast(pid, :throw_one)
+  def throw_one(pid), do: send(pid, :throw_one)
 
   @impl true
   def init(opts) do
@@ -30,13 +30,13 @@ defmodule SPE.JobManager do
   end
 
   @impl true
-  def handle_cast(:throw_one, state) do
+  def handle_info(:throw_one, state) do
     [task | rest] = state["queued"]
 
     input = build_input(task, state["results"])
 
     {:ok, _pid} =
-      Spe.TaskWorker.start_link(
+      SPE.TaskWorker.start_link(
         task["name"],
         task["exec"],
         input,
@@ -47,13 +47,13 @@ defmodule SPE.JobManager do
     new_state =
       state
       |> Map.put(:queued, rest)
-      |> Map.update!(:running, &MapSet.put(&1, task["name"]))
+      |> Map.update!("running", &MapSet.put(&1, task["name"]))
 
     {:noreply, new_state}
   end
 
   @impl true
-  def handle_cast({:task_finished, name, {:result, value}}, state) do
+  def handle_info({:task_finished, name, {:result, value}}, state) do
     send(state["server_pid"], :finished_one)
 
     state
@@ -62,7 +62,7 @@ defmodule SPE.JobManager do
     |> maybe_done()
   end
 
-  def handle_cast({:task_finished, name, {:failed, _reason}}, state) do
+  def handle_info({:task_finished, name, {:failed, _reason}}, state) do
     send(state["server_pid"], :finished_one)
 
     state
@@ -93,7 +93,7 @@ defmodule SPE.JobManager do
   end
 
   defp split_ready(tasks, results) do
-    Enum.split_with(tasks, &ready?/2, results)
+    split_with(tasks, &ready?/2, results)
   end
 
   defp ready?(task, results) do
@@ -131,7 +131,7 @@ defmodule SPE.JobManager do
     %{state | blocked: blocked_kept, results: results}
   end
 
-  defp maybe_done(%{blocked: [], queued: [], running: running} = state) do
+  defp maybe_done(%{"blocked" => [], "queued" => [], "running" => running} = state) do
     if MapSet.size(running) == 0 do
       send(state["server_pid"], {:job_finished, self(), state["results"]})
     end
@@ -141,7 +141,7 @@ defmodule SPE.JobManager do
 
   defp maybe_done(state), do: {:noreply, state}
 
-  defp Enum.split_with(list, fun, results) do
+  defp split_with(list, fun, results) do
     Enum.reduce(list, {[], []}, fn x, {true_acc, false_acc} ->
       if fun.(x, results), do: {[x | true_acc], false_acc}, else: {true_acc, [x | false_acc]}
     end)
