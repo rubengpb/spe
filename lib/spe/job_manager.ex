@@ -1,4 +1,4 @@
-defmodule Spe.JobManager do
+defmodule SPE.JobManager do
   use GenServer
 
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: opts[:name])
