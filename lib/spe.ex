@@ -1,9 +1,10 @@
 defmodule SPE do
   use GenServer
+  @name __MODULE__
 
-  def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
-  def submit_job(pid, job), do: GenServer.call(pid, {:submit_job, job})
-  def start_job(pid, job_id), do: GenServer.call(pid, {:start_job, job_id})
+  def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: @name)
+  def submit_job(job), do: GenServer.call(@name, {:submit_job, job})
+  def start_job(job_id), do: GenServer.call(@name, {:start_job, job_id})
 
   @impl true
   def init(opts) do
@@ -20,13 +21,26 @@ defmodule SPE do
   end
 
   @impl true
-  def handle_call({:submit_job, %{"name" => _name, "tasks" => _tasks} = job}, _from, state) do
-    job_id = state["next_id"]
-    new_next_id = job_id + 1
-    new_jobs = Map.put(state["jobs"], job_id, job)
+  def handle_call({:submit_job, %{"name" => name, "tasks" => tasks} = job}, _from, state) do
+    cond do
+      name == "" ->
+        {:reply, {:error, "Empty name"}, state}
 
-    new_state = %{state | "next_id" => new_next_id, "jobs" => new_jobs}
-    {:reply, {:ok, job_id}, new_state}
+      tasks == [] ->
+        {:reply, {:error, "Empty tasks"}, state}
+
+      # Enum.any?(tasks, fn t -> "name" in Map.keys(t) end) ->
+      #   {:reply, {:error, "Bad tasks"}, state}
+
+      true ->
+        job_id_int = state["next_id"]
+        job_id = to_string(job_id_int)
+        new_next_id = job_id_int + 1
+        new_jobs = Map.put(state["jobs"], job_id, job)
+
+        new_state = %{state | "next_id" => new_next_id, "jobs" => new_jobs}
+        {:reply, {:ok, job_id}, new_state}
+    end
   end
 
   @impl true
@@ -48,8 +62,7 @@ defmodule SPE do
         normalize_job = Map.put(job, "job_id", job_id)
         normalize_job = Map.put(normalize_job, "server_pid", self())
         SPE.JobManager.start_link(normalize_job)
-        Map.delete(state["jobs"], job_id)
-        {:reply, :ok, state}
+        {:reply, {:ok, job_id}, state}
     end
   end
 
@@ -83,11 +96,15 @@ defmodule SPE do
     {:noreply, new_state}
   end
 
-  def handle_info({:job_finished, _pid, result}, state) do
+  def handle_info({:job_finished, job_id, result}, state) do
     IO.puts("##### STATE #######")
     IO.inspect(state)
     IO.puts("##### RESULT #######")
     IO.inspect(result)
+    IO.puts("##### job_id #######")
+    IO.inspect(job_id)
+    # Phoenix.PubSub.broadcast(SPE.PubSub, job_id, {:succeeded, result})
+    Phoenix.PubSub.broadcast(SPE.PubSub, job_id, {:succeeded, result})
 
     {:noreply, state}
   end

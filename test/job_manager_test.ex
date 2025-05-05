@@ -6,14 +6,14 @@ defmodule JobManagetTest do
       "name" => "t1",
       "exec" => fn _ -> 1 + 2 end,
       "timeout" => :infinity,
-      "enable" => ["t2"]
+      "enables" => ["t2"]
     }
 
     task2 = %{
       "name" => "t2",
       "exec" => fn %{"t1" => val1} -> val1 + 1 end,
       "timeout" => :infinity,
-      "enable" => []
+      "enables" => []
     }
 
     job1 = %{"name" => "job1", "tasks" => [task1, task2]}
@@ -27,28 +27,28 @@ defmodule JobManagetTest do
       "name" => "task1",
       "exec" => fn _ -> 1 + 2 end,
       "timeout" => :infinity,
-      "enable" => ["task3"]
+      "enables" => ["task3"]
     }
 
     task2 = %{
       "name" => "task2",
       "exec" => fn _ -> 3 + 4 end,
       "timeout" => :infinity,
-      "enable" => ["task4"]
+      "enables" => ["task4"]
     }
 
     task3 = %{
       "name" => "task3",
       "exec" => fn %{"task1" => val1} -> val1 + 2 end,
       "timeout" => :infinity,
-      "enable" => ["task5"]
+      "enables" => ["task5"]
     }
 
     task4 = %{
       "name" => "task4",
       "exec" => fn %{"task2" => val2} -> val2 * 3 end,
       "timeout" => :infinity,
-      "enable" => ["task5"]
+      "enables" => ["task5"]
     }
 
     task5 = %{
@@ -57,14 +57,14 @@ defmodule JobManagetTest do
         IO.puts("value: #{inspect(val2 + val3 + val4)}")
       end,
       "timeout" => :infinity,
-      "enable" => []
+      "enables" => []
     }
 
     task6 = %{
       "name" => "task6",
       "exec" => fn _ -> IO.puts("hello") end,
       "timeout" => :infinity,
-      "enable" => []
+      "enables" => []
     }
 
     job1 = %{"name" => "job1", "tasks" => [task1, task2, task3, task4, task5, task6]}

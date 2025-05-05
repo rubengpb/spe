@@ -85,7 +85,8 @@ defmodule SPE.JobManager do
     Enum.map(tasks, fn task ->
       deps =
         tasks
-        |> Enum.filter(fn x -> task["name"] in x["enable"] end)
+        |> IO.inspect()
+        |> Enum.filter(fn x -> task["name"] in x["enables"] end)
         |> Enum.map(& &1["name"])
 
       Map.put(task, "deps", deps)
@@ -136,12 +137,12 @@ defmodule SPE.JobManager do
         end
       end)
 
-    %{state | blocked: blocked_kept, results: results}
+    %{state | "blocked" => blocked_kept, "results" => results}
   end
 
   defp maybe_done(%{"blocked" => [], "queued" => [], "running" => running} = state) do
     if MapSet.size(running) == 0 do
-      send(state["server_pid"], {:job_finished, self(), state["results"]})
+      send(state["server_pid"], {:job_finished, state["job_id"], state["results"]})
     end
 
     {:noreply, state}
