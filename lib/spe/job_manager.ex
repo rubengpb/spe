@@ -17,13 +17,13 @@ defmodule SPE.JobManager do
     Enum.each(ready, fn _ -> send(server_pid, {:there_is_worker, self()}) end)
 
     state = %{
-      job_id: opts["job_id"],
-      name: opts["name"],
-      server_pid: server_pid,
-      queued: ready,
-      blocked: blocked,
-      running: MapSet.new(),
-      results: %{}
+      "job_id" => opts["job_id"],
+      "name" => opts["name"],
+      "server_pid" => server_pid,
+      "queued" => ready,
+      "blocked" => blocked,
+      "running" => MapSet.new(),
+      "results" => %{}
     }
 
     {:ok, state}
@@ -31,9 +31,9 @@ defmodule SPE.JobManager do
 
   @impl true
   def handle_cast(:throw_one, state) do
-    [task | rest] = state.queued
+    [task | rest] = state["queued"]
 
-    input = build_input(task, state.results)
+    input = build_input(task, state["results"])
 
     {:ok, _pid} =
       Spe.TaskWorker.start_link(
@@ -54,7 +54,7 @@ defmodule SPE.JobManager do
 
   @impl true
   def handle_cast({:task_finished, name, {:result, value}}, state) do
-    send(state.server_pid, :finished_one)
+    send(state["server_pid"], :finished_one)
 
     state
     |> add_result(name, value)
@@ -63,7 +63,7 @@ defmodule SPE.JobManager do
   end
 
   def handle_cast({:task_finished, name, {:failed, _reason}}, state) do
-    send(state.server_pid, :finished_one)
+    send(state["server_pid"], :finished_one)
 
     state
     |> add_result(name, :failed)
@@ -74,7 +74,7 @@ defmodule SPE.JobManager do
 
   @impl true
   def handle_call(:results, _from, state) do
-    {:reply, state.results, state}
+    {:reply, state["results"], state}
   end
 
   defp normalize_task(task),
@@ -83,8 +83,8 @@ defmodule SPE.JobManager do
   defp add_result(state, name, result) do
     %{
       state
-      | running: MapSet.delete(state.running, name),
-        results: Map.put(state.results, name, result)
+      | running: MapSet.delete(state["running"], name),
+        results: Map.put(state["results"], name, result)
     }
   end
 
@@ -107,16 +107,16 @@ defmodule SPE.JobManager do
   end
 
   defp schedule_new_ready(state) do
-    {new_ready, still_blocked} = split_ready(state.blocked, state.results)
+    {new_ready, still_blocked} = split_ready(state["blocked"], state["results"])
 
-    Enum.each(new_ready, fn _ -> send(state.server_pid, {:there_is_worker, self()}) end)
+    Enum.each(new_ready, fn _ -> send(state["server_pid"], {:there_is_worker, self()}) end)
 
-    %{state | queued: state.queued ++ new_ready, blocked: still_blocked}
+    %{state | queued: state["queued"] ++ new_ready, blocked: still_blocked}
   end
 
   defp discard_dependents_failures(state) do
-    {blocked_kept, failed_now, results} =
-      Enum.reduce(state.blocked, {[], [], state.results}, fn task, {keep, fail, res} ->
+    {blocked_kept, _failed_now, results} =
+      Enum.reduce(state["blocked"], {[], [], state["results"]}, fn task, {keep, fail, res} ->
         if Enum.any?(task["deps"], &(res[&1] == :failed)) do
           {
             keep,
@@ -133,7 +133,7 @@ defmodule SPE.JobManager do
 
   defp maybe_done(%{blocked: [], queued: [], running: running} = state) do
     if MapSet.size(running) == 0 do
-      send(state.server_pid, {:job_finished, self(), state.results})
+      send(state["server_pid"], {:job_finished, self(), state["results"]})
     end
 
     {:noreply, state}
@@ -148,4 +148,3 @@ defmodule SPE.JobManager do
     |> then(fn {t, f} -> {Enum.reverse(t), Enum.reverse(f)} end)
   end
 end
-
