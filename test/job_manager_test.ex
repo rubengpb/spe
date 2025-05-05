@@ -15,5 +15,13 @@ defmodule JobManagetTest do
       "timeout" => :infinity,
       "enable" => []
     }
+
+    {:ok, pid} =
+      SPE.JobManager.start_link(%{
+        "job_id" => 1,
+        "name" => "job1",
+        "server_pid" => self(),
+        "tasks" => [task1, task2]
+      })
   end
 end
