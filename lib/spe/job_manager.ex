@@ -109,6 +109,7 @@ defmodule SPE.JobManager do
     Enum.all?(task["deps"], fn dep ->
       case Map.fetch(results, dep) do
         {:ok, :failed} -> false
+        {:ok, :not_run} -> false
         {:ok, _value} -> true
         :error -> false
       end
@@ -126,11 +127,11 @@ defmodule SPE.JobManager do
   defp discard_dependents_failures(state) do
     {blocked_kept, _failed_now, results} =
       Enum.reduce(state["blocked"], {[], [], state["results"]}, fn task, {keep, fail, res} ->
-        if Enum.any?(task["deps"], &(res[&1] == :failed)) do
+        if Enum.any?(task["deps"], &(res[&1] == :not_run)) do
           {
             keep,
             [task["name"] | fail],
-            Map.put(res, task["name"], :failed)
+            Map.put(res, task["name"], :not_run)
           }
         else
           {[task | keep], fail, res}
