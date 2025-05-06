@@ -23,14 +23,22 @@ defmodule SPE do
   @impl true
   def handle_call({:submit_job, %{"name" => name, "tasks" => tasks} = job}, _from, state) do
     cond do
+      not is_binary(name) ->
+        {:reply, {:error, "Name must be an string"}, state}
+
       name == "" ->
         {:reply, {:error, "Empty name"}, state}
 
       tasks == [] ->
         {:reply, {:error, "Empty tasks"}, state}
 
-      # Enum.any?(tasks, fn t -> "name" in Map.keys(t) end) ->
-      #   {:reply, {:error, "Bad tasks"}, state}
+      Enum.any?(tasks, fn t ->
+        not good_task(t)
+      end) ->
+        {:reply, {:error, "Bad tasks"}, state}
+
+      not correct_names(tasks) ->
+        {:reply, {:error, "Bad names of tasks"}, state}
 
       true ->
         job_id_int = state["next_id"]
@@ -107,5 +115,33 @@ defmodule SPE do
     Phoenix.PubSub.broadcast(SPE.PubSub, job_id, {:succeeded, result})
 
     {:noreply, state}
+  end
+
+  defp good_task(
+         %{"name" => name, "exec" => exec, "timeout" => timeout, "enables" => enables} = _task
+       ) do
+    is_binary(name) && name != "" && is_function(exec) &&
+      (timeout == :infinity or is_integer(timeout)) &&
+      is_list(enables)
+  end
+
+  defp good_task(_task), do: false
+
+  defp correct_names(tasks) do
+    enables =
+      Enum.reduce(tasks, [], fn %{"enables" => enables}, acc -> enables ++ acc end)
+      |> Enum.uniq()
+
+    names =
+      Enum.map(tasks, fn t -> t["name"] end)
+
+    exit_enables =
+      Enum.all?(enables, fn e -> e in names end)
+
+    different_names =
+      Enum.uniq(names) ==
+        names
+
+    exit_enables && different_names
   end
 end
