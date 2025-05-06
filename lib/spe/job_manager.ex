@@ -33,7 +33,16 @@ defmodule SPE.JobManager do
   def handle_info(:throw_one, state) do
     [task | rest] = state["queued"]
 
-    input = state["results"]
+    input =
+      Enum.reduce(state["results"], %{}, fn {k, value}, acc ->
+        case value do
+          {:result, new_value} ->
+            Map.put(acc, k, new_value)
+
+          _ ->
+            acc
+        end
+      end)
 
     {:ok, _pid} =
       SPE.TaskWorker.start_link(
@@ -55,18 +64,32 @@ defmodule SPE.JobManager do
   @impl true
   def handle_info({:task_finished, name, {:result, value}}, state) do
     send(state["server_pid"], :finished_one)
+    job_id = state["job_id"]
+
+    Phoenix.PubSub.local_broadcast(
+      SPE.PubSub,
+      job_id,
+      {:spe, :erlang.monotonic_time(:millisecond), {job_id, :task_terminated, name}}
+    )
 
     state
-    |> add_result(name, value)
+    |> add_result(name, {:result, value})
     |> schedule_new_ready()
     |> maybe_done()
   end
 
-  def handle_info({:task_finished, name, {:failed, _reason}}, state) do
+  def handle_info({:task_finished, name, {:failed, reason}}, state) do
     send(state["server_pid"], :finished_one)
+    job_id = state["job_id"]
+
+    Phoenix.PubSub.local_broadcast(
+      SPE.PubSub,
+      job_id,
+      {:spe, :erlang.monotonic_time(:millisecond), {job_id, :task_terminated, name}}
+    )
 
     state
-    |> add_result(name, :failed)
+    |> add_result(name, {:failed, reason})
     |> discard_dependents_failures()
     |> schedule_new_ready()
     |> maybe_done()
@@ -144,6 +167,14 @@ defmodule SPE.JobManager do
   defp maybe_done(%{"blocked" => [], "queued" => [], "running" => running} = state) do
     if MapSet.size(running) == 0 do
       send(state["server_pid"], {:job_finished, state["job_id"], state["results"]})
+      job_id = state["job_id"]
+
+      Phoenix.PubSub.local_broadcast(
+        SPE.PubSub,
+        job_id,
+        {:spe, :erlang.monotonic_time(:millisecond),
+         {job_id, :result, {:succeeded, state["results"]}}}
+      )
     end
 
     {:noreply, state}

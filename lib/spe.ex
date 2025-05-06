@@ -112,7 +112,6 @@ defmodule SPE do
     IO.puts("##### job_id #######")
     IO.inspect(job_id)
     # Phoenix.PubSub.broadcast(SPE.PubSub, job_id, {:succeeded, result})
-    Phoenix.PubSub.broadcast(SPE.PubSub, job_id, {:succeeded, result})
 
     {:noreply, state}
   end
