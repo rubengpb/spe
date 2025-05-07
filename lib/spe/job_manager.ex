@@ -23,6 +23,7 @@ defmodule SPE.JobManager do
       "queued" => ready,
       "blocked" => blocked,
       "running" => MapSet.new(),
+      "status" => :succeeded,
       "results" => %{}
     }
 
@@ -43,6 +44,14 @@ defmodule SPE.JobManager do
             acc
         end
       end)
+
+    job_id = state["job_id"]
+
+    Phoenix.PubSub.local_broadcast(
+      SPE.PubSub,
+      job_id,
+      {:spe, :erlang.monotonic_time(:millisecond), {job_id, :task_started, task["name"]}}
+    )
 
     {:ok, _pid} =
       SPE.TaskWorker.start_link(
@@ -92,6 +101,7 @@ defmodule SPE.JobManager do
     |> add_result(name, {:failed, reason})
     |> discard_dependents_failures()
     |> schedule_new_ready()
+    |> Map.put("status", :failed)
     |> maybe_done()
   end
 
@@ -108,7 +118,6 @@ defmodule SPE.JobManager do
     Enum.map(tasks, fn task ->
       deps =
         tasks
-        |> IO.inspect()
         |> Enum.filter(fn x -> task["name"] in x["enables"] end)
         |> Enum.map(& &1["name"])
 
@@ -150,7 +159,7 @@ defmodule SPE.JobManager do
   defp discard_dependents_failures(state) do
     {blocked_kept, _failed_now, results} =
       Enum.reduce(state["blocked"], {[], [], state["results"]}, fn task, {keep, fail, res} ->
-        if Enum.any?(task["deps"], &(res[&1] == :not_run)) do
+        if Enum.any?(task["deps"], &(res[&1] == :not_run or match?({:failed, _}, res[&1]))) do
           {
             keep,
             [task["name"] | fail],
@@ -173,7 +182,7 @@ defmodule SPE.JobManager do
         SPE.PubSub,
         job_id,
         {:spe, :erlang.monotonic_time(:millisecond),
-         {job_id, :result, {:succeeded, state["results"]}}}
+         {job_id, :result, {state["status"], state["results"]}}}
       )
     end
 

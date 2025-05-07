@@ -22,6 +22,11 @@ defmodule SPE do
 
   @impl true
   def handle_call({:submit_job, %{"name" => name, "tasks" => tasks} = job}, _from, state) do
+    new_tasks =
+      Enum.map(tasks, fn t ->
+        t |> Map.put_new("timeout", :infinity) |> Map.put_new("enables", [])
+      end)
+
     cond do
       not is_binary(name) ->
         {:reply, {:error, "Name must be an string"}, state}
@@ -29,22 +34,22 @@ defmodule SPE do
       name == "" ->
         {:reply, {:error, "Empty name"}, state}
 
-      tasks == [] ->
+      new_tasks == [] ->
         {:reply, {:error, "Empty tasks"}, state}
 
-      Enum.any?(tasks, fn t ->
+      Enum.any?(new_tasks, fn t ->
         not good_task(t)
       end) ->
         {:reply, {:error, "Bad tasks"}, state}
 
-      not correct_names(tasks) ->
+      not correct_names(new_tasks) ->
         {:reply, {:error, "Bad names of tasks"}, state}
 
       true ->
         job_id_int = state["next_id"]
         job_id = to_string(job_id_int)
         new_next_id = job_id_int + 1
-        new_jobs = Map.put(state["jobs"], job_id, job)
+        new_jobs = Map.put(state["jobs"], job_id, %{job | "tasks" => new_tasks})
 
         new_state = %{state | "next_id" => new_next_id, "jobs" => new_jobs}
         {:reply, {:ok, job_id}, new_state}
@@ -59,16 +64,18 @@ defmodule SPE do
 
   @impl true
   def handle_call({:start_job, job_id}, _from, state) do
-    IO.inspect(state)
-
     case Map.get(state["jobs"], job_id) do
       nil ->
         response = {:error, "Not exist job with this id: #{job_id}"}
         {:reply, response, state}
 
       job ->
-        normalize_job = Map.put(job, "job_id", job_id)
-        normalize_job = Map.put(normalize_job, "server_pid", self())
+        normalize_job =
+          Map.put(job, "job_id", job_id)
+          |> Map.put("server_pid", self())
+          |> Map.put_new("timeout", :infinity)
+          |> Map.put_new("enables", [])
+
         SPE.JobManager.start_link(normalize_job)
         {:reply, {:ok, job_id}, state}
     end
@@ -98,21 +105,13 @@ defmodule SPE do
 
         [pid | rest] ->
           send(pid, :throw_one)
-          %{state | "pid_queued_jobs" => rest, "current_workers" => state["current_workers"] - 1}
+          %{state | "pid_queued_jobs" => rest}
       end
 
     {:noreply, new_state}
   end
 
-  def handle_info({:job_finished, job_id, result}, state) do
-    IO.puts("##### STATE #######")
-    IO.inspect(state)
-    IO.puts("##### RESULT #######")
-    IO.inspect(result)
-    IO.puts("##### job_id #######")
-    IO.inspect(job_id)
-    # Phoenix.PubSub.broadcast(SPE.PubSub, job_id, {:succeeded, result})
-
+  def handle_info({:job_finished, _job_id, _result}, state) do
     {:noreply, state}
   end
 
