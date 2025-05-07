@@ -23,6 +23,7 @@ defmodule SPE.JobManager do
       "queued" => ready,
       "blocked" => blocked,
       "running" => MapSet.new(),
+      "status" => :succeeded,
       "results" => %{}
     }
 
@@ -33,7 +34,24 @@ defmodule SPE.JobManager do
   def handle_info(:throw_one, state) do
     [task | rest] = state["queued"]
 
-    input = state["results"]
+    input =
+      Enum.reduce(state["results"], %{}, fn {k, value}, acc ->
+        case value do
+          {:result, new_value} ->
+            Map.put(acc, k, new_value)
+
+          _ ->
+            acc
+        end
+      end)
+
+    job_id = state["job_id"]
+
+    Phoenix.PubSub.local_broadcast(
+      SPE.PubSub,
+      job_id,
+      {:spe, :erlang.monotonic_time(:millisecond), {job_id, :task_started, task["name"]}}
+    )
 
     {:ok, _pid} =
       SPE.TaskWorker.start_link(
@@ -55,20 +73,35 @@ defmodule SPE.JobManager do
   @impl true
   def handle_info({:task_finished, name, {:result, value}}, state) do
     send(state["server_pid"], :finished_one)
+    job_id = state["job_id"]
+
+    Phoenix.PubSub.local_broadcast(
+      SPE.PubSub,
+      job_id,
+      {:spe, :erlang.monotonic_time(:millisecond), {job_id, :task_terminated, name}}
+    )
 
     state
-    |> add_result(name, value)
+    |> add_result(name, {:result, value})
     |> schedule_new_ready()
     |> maybe_done()
   end
 
-  def handle_info({:task_finished, name, {:failed, _reason}}, state) do
+  def handle_info({:task_finished, name, {:failed, reason}}, state) do
     send(state["server_pid"], :finished_one)
+    job_id = state["job_id"]
+
+    Phoenix.PubSub.local_broadcast(
+      SPE.PubSub,
+      job_id,
+      {:spe, :erlang.monotonic_time(:millisecond), {job_id, :task_terminated, name}}
+    )
 
     state
-    |> add_result(name, :failed)
+    |> add_result(name, {:failed, reason})
     |> discard_dependents_failures()
     |> schedule_new_ready()
+    |> Map.put("status", :failed)
     |> maybe_done()
   end
 
@@ -85,7 +118,7 @@ defmodule SPE.JobManager do
     Enum.map(tasks, fn task ->
       deps =
         tasks
-        |> Enum.filter(fn x -> task["name"] in x["enable"] end)
+        |> Enum.filter(fn x -> task["name"] in x["enables"] end)
         |> Enum.map(& &1["name"])
 
       Map.put(task, "deps", deps)
@@ -108,6 +141,7 @@ defmodule SPE.JobManager do
     Enum.all?(task["deps"], fn dep ->
       case Map.fetch(results, dep) do
         {:ok, :failed} -> false
+        {:ok, :not_run} -> false
         {:ok, _value} -> true
         :error -> false
       end
@@ -125,23 +159,31 @@ defmodule SPE.JobManager do
   defp discard_dependents_failures(state) do
     {blocked_kept, _failed_now, results} =
       Enum.reduce(state["blocked"], {[], [], state["results"]}, fn task, {keep, fail, res} ->
-        if Enum.any?(task["deps"], &(res[&1] == :failed)) do
+        if Enum.any?(task["deps"], &(res[&1] == :not_run or match?({:failed, _}, res[&1]))) do
           {
             keep,
             [task["name"] | fail],
-            Map.put(res, task["name"], :failed)
+            Map.put(res, task["name"], :not_run)
           }
         else
           {[task | keep], fail, res}
         end
       end)
 
-    %{state | blocked: blocked_kept, results: results}
+    %{state | "blocked" => blocked_kept, "results" => results}
   end
 
   defp maybe_done(%{"blocked" => [], "queued" => [], "running" => running} = state) do
     if MapSet.size(running) == 0 do
-      send(state["server_pid"], {:job_finished, self(), state["results"]})
+      send(state["server_pid"], {:job_finished, state["job_id"], state["results"]})
+      job_id = state["job_id"]
+
+      Phoenix.PubSub.local_broadcast(
+        SPE.PubSub,
+        job_id,
+        {:spe, :erlang.monotonic_time(:millisecond),
+         {job_id, :result, {state["status"], state["results"]}}}
+      )
     end
 
     {:noreply, state}

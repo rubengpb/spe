@@ -1,9 +1,10 @@
 defmodule SPE do
   use GenServer
+  @name __MODULE__
 
-  def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
-  def submit_job(pid, job), do: GenServer.call(pid, {:submit_job, job})
-  def start_job(pid, job_id), do: GenServer.call(pid, {:start_job, job_id})
+  def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: @name)
+  def submit_job(job), do: GenServer.call(@name, {:submit_job, job})
+  def start_job(job_id), do: GenServer.call(@name, {:start_job, job_id})
 
   @impl true
   def init(opts) do
@@ -20,13 +21,39 @@ defmodule SPE do
   end
 
   @impl true
-  def handle_call({:submit_job, %{"name" => _name, "tasks" => _tasks} = job}, _from, state) do
-    job_id = state["next_id"]
-    new_next_id = job_id + 1
-    new_jobs = Map.put(state["jobs"], job_id, job)
+  def handle_call({:submit_job, %{"name" => name, "tasks" => tasks} = job}, _from, state) do
+    new_tasks =
+      Enum.map(tasks, fn t ->
+        t |> Map.put_new("timeout", :infinity) |> Map.put_new("enables", [])
+      end)
 
-    new_state = %{state | "next_id" => new_next_id, "jobs" => new_jobs}
-    {:reply, {:ok, job_id}, new_state}
+    cond do
+      not is_binary(name) ->
+        {:reply, {:error, "Name must be an string"}, state}
+
+      name == "" ->
+        {:reply, {:error, "Empty name"}, state}
+
+      new_tasks == [] ->
+        {:reply, {:error, "Empty tasks"}, state}
+
+      Enum.any?(new_tasks, fn t ->
+        not good_task(t)
+      end) ->
+        {:reply, {:error, "Bad tasks"}, state}
+
+      not correct_names(new_tasks) ->
+        {:reply, {:error, "Bad names of tasks"}, state}
+
+      true ->
+        job_id_int = state["next_id"]
+        job_id = to_string(job_id_int)
+        new_next_id = job_id_int + 1
+        new_jobs = Map.put(state["jobs"], job_id, %{job | "tasks" => new_tasks})
+
+        new_state = %{state | "next_id" => new_next_id, "jobs" => new_jobs}
+        {:reply, {:ok, job_id}, new_state}
+    end
   end
 
   @impl true
@@ -37,19 +64,20 @@ defmodule SPE do
 
   @impl true
   def handle_call({:start_job, job_id}, _from, state) do
-    IO.inspect(state)
-
     case Map.get(state["jobs"], job_id) do
       nil ->
         response = {:error, "Not exist job with this id: #{job_id}"}
         {:reply, response, state}
 
       job ->
-        normalize_job = Map.put(job, "job_id", job_id)
-        normalize_job = Map.put(normalize_job, "server_pid", self())
+        normalize_job =
+          Map.put(job, "job_id", job_id)
+          |> Map.put("server_pid", self())
+          |> Map.put_new("timeout", :infinity)
+          |> Map.put_new("enables", [])
+
         SPE.JobManager.start_link(normalize_job)
-        Map.delete(state["jobs"], job_id)
-        {:reply, :ok, state}
+        {:reply, {:ok, job_id}, state}
     end
   end
 
@@ -77,18 +105,41 @@ defmodule SPE do
 
         [pid | rest] ->
           send(pid, :throw_one)
-          %{state | "pid_queued_jobs" => rest, "current_workers" => state["current_workers"] - 1}
+          %{state | "pid_queued_jobs" => rest}
       end
 
     {:noreply, new_state}
   end
 
-  def handle_info({:job_finished, _pid, result}, state) do
-    IO.puts("##### STATE #######")
-    IO.inspect(state)
-    IO.puts("##### RESULT #######")
-    IO.inspect(result)
-
+  def handle_info({:job_finished, _job_id, _result}, state) do
     {:noreply, state}
+  end
+
+  defp good_task(
+         %{"name" => name, "exec" => exec, "timeout" => timeout, "enables" => enables} = _task
+       ) do
+    is_binary(name) && name != "" && is_function(exec) &&
+      (timeout == :infinity or is_integer(timeout)) &&
+      is_list(enables)
+  end
+
+  defp good_task(_task), do: false
+
+  defp correct_names(tasks) do
+    enables =
+      Enum.reduce(tasks, [], fn %{"enables" => enables}, acc -> enables ++ acc end)
+      |> Enum.uniq()
+
+    names =
+      Enum.map(tasks, fn t -> t["name"] end)
+
+    exit_enables =
+      Enum.all?(enables, fn e -> e in names end)
+
+    different_names =
+      Enum.uniq(names) ==
+        names
+
+    exit_enables && different_names
   end
 end

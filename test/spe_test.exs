@@ -70,7 +70,7 @@ end
   end
 
   test "start_job3" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn _ -> 1 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => [], "exec" => fn _ -> 2 end, "timeout" => :infinity}
     result = SPE.submit_job(%{"name" => "nisse", "tasks" => [task1,task2]})
@@ -82,7 +82,7 @@ end
   end
 
   test "start_job4" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn _ -> 1 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => [], "exec" => fn _ -> 2 end, "timeout" => :infinity}
     result = SPE.submit_job(%{"name" => "nisse", "tasks" => [task1,task2]})
@@ -94,7 +94,7 @@ end
   end
 
   test "start_job5" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(_) -> 1+2 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => [], "exec" => fn(_) -> 3+4 end, "timeout" => :infinity}
     result = SPE.submit_job(%{"name" => "nisse", "tasks" => [task1,task2]})
@@ -107,7 +107,7 @@ end
   
   @tag :failing
   test "start_job_failing" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task0 = %{"name" => "t0", "enables" => [], "exec" => fn(_) -> Process.exit(self(),:brutal_kill) end, "timeout" => :infinity}
     task1 = %{"name" => "t1", "enables" => [], "exec" => fn(_) -> Process.exit(self(),:because_i_am_bad) end, "timeout" => :infinity}
     task2 = %{"name" => "t2", "enables" => [], "exec" => fn(_) -> raise "no_future" end, "timeout" => :infinity}
@@ -121,7 +121,7 @@ end
   end
   
   test "job_enables1" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(%{"t1" => value}) -> value+2 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => ["t0"], "exec" => fn(_) -> 3+4 end, "timeout" => :infinity}
     assert {:ok, job_id} = SPE.submit_job(%{"name" => "nisse", "tasks" => [task1,task2]})
@@ -132,7 +132,7 @@ end
   end
   
   test "job_enables_fails" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(%{"t1" => value}) -> value+2 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => ["t0"], "exec" => fn(_) -> 2/0 end, "timeout" => :infinity}
     result = SPE.submit_job(%{"name" => "nisse", "tasks" => [task1,task2]})
@@ -140,11 +140,11 @@ end
     Phoenix.PubSub.subscribe(SPE.PubSub,id)
     SPE.start_job(id)
     all_broadcasts = get_all_broadcasts(500)
-    assert {:failed, %{ "t0" => {:not_run,_}, "t1" => {:failed,_} }} = get_result(id, all_broadcasts)
+    assert {:failed, %{ "t0" => :not_run, "t1" => {:failed,_} }} = get_result(id, all_broadcasts)
   end
   
   test "job_enables_timeout" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(%{"t1" => value}) -> value+2 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => ["t0"], "exec" => fn(_) -> Process.sleep(2000) end, "timeout" => 200}
     result = SPE.submit_job(%{"name" => "nisse", "tasks" => [task1,task2]})
@@ -152,11 +152,11 @@ end
     Phoenix.PubSub.subscribe(SPE.PubSub,id)
     SPE.start_job(id)
     all_broadcasts = get_all_broadcasts(500)
-    assert {:failed, %{ "t0" => {:not_run,_}, "t1" => {:failed,_} }} = get_result(id, all_broadcasts)
+    assert {:failed, %{ "t0" => :not_run, "t1" => {:failed,_} }} = get_result(id, all_broadcasts)
   end
   
   test "job_enables2" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(m) ->
                %{"t1" => t1, "t2" => t2} = m
                t1+t2+2
@@ -172,7 +172,7 @@ end
   end
   
   test "job_enables_transitive" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(%{"t1" => t1, "t2" => t2}) -> t1+t2+2 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => ["t0"], "exec" => fn(%{"t2" => t2}) -> t2+4 end, "timeout" => :infinity}
     task3 = %{"name" => "t2", "enables" => ["t1"], "exec" => fn(_) -> 8+9 end, "timeout" => :infinity}
@@ -196,8 +196,8 @@ end
     Phoenix.PubSub.subscribe(SPE.PubSub,id)
     SPE.start_job(id)
     all_broadcasts = get_all_broadcasts(500)
-    IO.puts("all_broadcasts=#{inspect all_broadcasts}")
-    assert {:failed, %{ "t0" => {:failed,:timeout}, "t1" => {:not_run,_} }} = get_result(id, all_broadcasts)
+    # IO.puts("all_broadcasts=#{inspect all_broadcasts}")
+    assert {:failed, %{ "t0" => {:failed,:timeout}, "t1" => :not_run }} = get_result(id, all_broadcasts)
   end
 
   test "big_test" do
@@ -241,7 +241,7 @@ end
   end
 
   test "multiple_jobs" do
-    assert {:ok,_} = SPE.start_link(n_workers: 10)
+    assert {:ok,_} = SPE.start_link(num_workers: 10)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(%{"t1" => value}) -> value+2 end, "timeout" => :infinity}
     task2 = %{"name" => "t1", "enables" => ["t0"], "exec" => fn(_) ->
                Process.sleep(100)
@@ -267,7 +267,7 @@ end
   end
   
   test "task_timing1" do
-    assert {:ok,_} = SPE.start_link(n_workers: 1)
+    assert {:ok,_} = SPE.start_link(num_workers: 1)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(_) ->
                Process.sleep(500)
                2+1
@@ -299,7 +299,7 @@ end
   end
   
   test "task_timing2" do
-    assert {:ok,_} = SPE.start_link(n_workers: 2)
+    assert {:ok,_} = SPE.start_link(num_workers: 2)
     task1 = %{"name" => "t0", "enables" => [], "exec" => fn(_) ->
                Process.sleep(500)
                2+1
