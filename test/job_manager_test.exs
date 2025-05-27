@@ -17,9 +17,9 @@ defmodule JobManagetTest do
     }
 
     job1 = %{"name" => "job1", "tasks" => [task1, task2]}
-    {:ok, pid} = SPE.start_link(num_workers: 4)
-    SPE.submit_job(pid, job1)
-    SPE.start_job(pid, 0)
+    {:ok, _pid} = SPE.start_link(num_workers: 4)
+    {:ok, pid_submitted} = SPE.submit_job(job1)
+    SPE.start_job(pid_submitted)
   end
 
   test "case of enun" do
@@ -69,10 +69,10 @@ defmodule JobManagetTest do
 
     job1 = %{"name" => "job1", "tasks" => [task1, task2, task3, task4, task5, task6]}
     job2 = %{"name" => "job2", "tasks" => [task6]}
-    {:ok, pid} = SPE.start_link(num_workers: 4)
-    SPE.submit_job(pid, job1)
-    SPE.submit_job(pid, job2)
-    SPE.start_job(pid, 0)
-    SPE.start_job(pid, 1)
+    {:ok, _pid} = SPE.start_link(num_workers: 4)
+    {:ok, pid_submitted_1} = SPE.submit_job(job1)
+    {:ok, pid_submitted_2} = SPE.submit_job(job2)
+    SPE.start_job(pid_submitted_1)
+    SPE.start_job(pid_submitted_2)
   end
 end
