@@ -1,5 +1,7 @@
 \documentclass{beamer}
-\usepackage{tikz}   %% load tikz before rubikcube
+
+\usepackage{tikz}
+\usepackage{listings}
 \usetikzlibrary{arrows.meta}
 \usetikzlibrary{calc,positioning,arrows}
 
@@ -12,12 +14,67 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
 \date{May, 2025}
 
 \begin{document}
+\lstdefinelanguage{elixir}{
+    morekeywords={
+      after,
+      alias,
+      and,
+      case,
+      catch,
+      cond,
+      def,
+      defimpl,
+      defmacro,
+      defmacrop,
+      defmodule,
+      defoverridable,
+      defp,
+      defprotocol,
+      defstruct,
+      do,
+      else,
+      end,
+      false,
+      fn,
+      for,
+      if,
+      import,
+      in,
+      nil,
+      not,
+      or,
+      quote,
+      raise,
+      receive,
+      require,
+      rescue,
+      true,
+      try,
+      unless,
+      use,
+      when,
+      with,
+      unquote,
+      defdelegate
+    },
+    emph={iex},
+    alsoletter={:},
+    sensitive=true,
+    morecomment=[l]{\#},
+    morecomment=[n]{/*}{*/},
+    morecomment=[n]{@doc\ "}{"},
+    morecomment=[n]{@doc\ """}{"""},
+    string=[b]",
+    morestring=[b]'
+}
 
 \begin{frame}[plain]
   \titlepage
 \end{frame}
 
-
+\begin{frame}{Introduction}
+    lksjflkñaj
+\end{frame}
 
 \begin{frame}{Design}
 
@@ -52,63 +109,100 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
 \end{figure}
 \end{frame}
 
-\begin{frame}{Messages}
+\begin{frame}{Messages SPE}
     \begin{table}[]
         \centering
-        \begin{tabular}{|c|c|}
+        \begin{tabular}{|c|c|c|}
         \hline
-        TO: & Message \\
-        \hline
-        \hline
-        Job manager &  \\
-        Task worker & Handle cast \\
-        \hline
-        \end{tabular}
-        \caption{SPE table}
-    \end{table}
-
-    \begin{table}[]
-        \centering
-        \begin{tabular}{|c|c|}
-        \hline
-        TO: & Message \\
+        From & To & Message \\
         \hline
         \hline
-        Job manager &  \\
-        Task worker & Handle cast \\
+        \hline
+        User & \textbf{SPE} & start \\
+        User & \textbf{SPE} & submit\_job \\
+        User & \textbf{SPE} &  start\_job \\
+        \textbf{SPE} & Task worker & start \\
+        \textbf{SPE} & Job manager &  thow\_one\\
         \hline
         \end{tabular}
-        \caption{Job manager}
-    \end{table}
-    \begin{table}[]
-        \centering
-        \begin{tabular}{|c|c|}
-        \hline
-        TO: & Message \\
-        \hline
-        \hline
-        Job manager &  \\
-        Task worker & Handle cast \\
-        \hline
-        \end{tabular}
-        \caption{SPE table}
     \end{table}
 \end{frame}
 
-\begin{frame}{SPE}
+\begin{frame}{Messages Job Manager}
+
+    \begin{table}[]
+        \centering
+        \begin{tabular}{|c|c|c|}
+        \hline
+        From & To & Message \\
+        \hline
+        \hline
+        \hline
+        \textbf{Job Manager} & SPE & there\_is\_worker \\
+        \textbf{Job Manager} & SPE & finished\_one \\
+        \textbf{Job Manager} & SPE & job\_finished \\
+        \textbf{Job Manager} & Task worker & start \\
+        
+        \hline
+        \end{tabular}
+    \end{table}
+
+\end{frame}
+
+\begin{frame}{Task worker}
+
+    \begin{table}[]
+        \centering
+        \begin{tabular}{|c|c|c|}
+        \hline
+        From & To & Message \\
+        \hline
+        \hline
+        \hline
+        \textbf{Task worker} & Job Manager & task\_finished \\
+        \hline
+        \end{tabular}
+    \end{table}
+\end{frame}
+
+\begin{frame}{Implementation details}
+
     \begin{table}[]
         \centering
         \begin{tabular}{|c|c|}
         \hline
-        TO: & Message \\
+        Element & Implementation \\
         \hline
         \hline
-        Job manager &  \\
-        Task worker & Handle cast \\
+        \hline
+        \textbf{SPE} & GenServer \\
+        \textbf{Job manager} & GenServer \\
+        \textbf{Task worker} & Task \\
         \hline
         \end{tabular}
-        \caption{Task worker}
     \end{table}
+    
+\end{frame}
+
+
+\begin{frame}{State SPE}
+    afsdf
+\end{frame}
+
+\begin{frame}{State Job Manager}
+    sdfasfd
+\end{frame}
+
+\begin{frame}[fragile]{Task implementation}
+
+\begin{lstlisting}[language=elixir]
+    Task.start(
+        fn -> 
+            run(name, fun, input, timeout, caller) 
+        end
+    )
+\end{lstlisting}
+   
 \end{frame}
 
 \end{document}
