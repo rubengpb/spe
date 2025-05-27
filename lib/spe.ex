@@ -8,15 +8,15 @@ defmodule SPE do
 
   @impl true
   def init(opts) do
-    num_workers = Keyword.get(opts, :num_workers, :unbounded)
+    max_workers = Keyword.get(opts, :num_workers, :unbounded)
 
     {:ok,
      %{
-       "num_workers" => num_workers,
+       "max_workers" => max_workers,
        "current_workers" => 0,
        "pid_queued_jobs" => [],
        "jobs" => %{},
-       "next_id" => 0
+       "next_unique_id" => 0
      }}
   end
 
@@ -46,19 +46,19 @@ defmodule SPE do
         {:reply, {:error, "Bad names of tasks"}, state}
 
       true ->
-        job_id_int = state["next_id"]
-        job_id = to_string(job_id_int)
-        new_next_id = job_id_int + 1
-        new_jobs = Map.put(state["jobs"], job_id, %{job | "tasks" => new_tasks})
+        job_id_int = state["next_unique_id"]
+        job_id_str = to_string(job_id_int)
+        new_next_unique_id = job_id_int + 1
+        new_jobs = Map.put(state["jobs"], job_id_str, %{job | "tasks" => new_tasks})
 
-        new_state = %{state | "next_id" => new_next_id, "jobs" => new_jobs}
-        {:reply, {:ok, job_id}, new_state}
+        new_state = %{state | "next_unique_id" => new_next_unique_id, "jobs" => new_jobs}
+        {:reply, {:ok, job_id_str}, new_state}
     end
   end
 
   @impl true
   def handle_call({:submit_job, _bad_job}, _from, state) do
-    response = {:error, "Not name or tasks keys in the job"}
+    response = {:error, "Empty name or tasks keys in sumbit_job"}
     {:reply, response, state}
   end
 
@@ -66,7 +66,7 @@ defmodule SPE do
   def handle_call({:start_job, job_id}, _from, state) do
     case Map.get(state["jobs"], job_id) do
       nil ->
-        response = {:error, "Not exist job with this id: #{job_id}"}
+        response = {:error, "Job with id: #{job_id} does not exist"}
         {:reply, response, state}
 
       job ->
@@ -82,11 +82,11 @@ defmodule SPE do
   end
 
   @impl true
-  def handle_info({:there_is_worker, job_pid}, state) do
+  def handle_info({:existing_worker, job_pid}, state) do
     new_state =
-      case state["current_workers"] < state["num_workers"] do
+      case state["current_workers"] < state["max_workers"] do
         true ->
-          send(job_pid, :throw_one)
+          send(job_pid, :start_one_job)
           %{state | "current_workers" => state["current_workers"] + 1}
 
         _ ->
@@ -97,17 +97,16 @@ defmodule SPE do
   end
 
   @impl true
-  def handle_info(:finished_one, state) do
+  def handle_info(:finished_one_job, state) do
     new_state =
       case state["pid_queued_jobs"] do
         [] ->
           %{state | "current_workers" => state["current_workers"] - 1}
 
         [pid | rest] ->
-          send(pid, :throw_one)
+          send(pid, :start_one_job)
           %{state | "pid_queued_jobs" => rest}
       end
-
     {:noreply, new_state}
   end
 
@@ -137,8 +136,7 @@ defmodule SPE do
       Enum.all?(enables, fn e -> e in names end)
 
     different_names =
-      Enum.uniq(names) ==
-        names
+      Enum.uniq(names) == names
 
     exit_enables && different_names
   end

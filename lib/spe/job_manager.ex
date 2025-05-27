@@ -6,7 +6,7 @@ defmodule SPE.JobManager do
   def get_results(pid), do: GenServer.call(pid, :results)
   def get_tasks(pid), do: GenServer.call(pid, :tasks)
 
-  def throw_one(pid), do: send(pid, :throw_one)
+  #def start_one_job(pid), do: send(pid, :start_one_job)
 
   @impl true
   def init(opts) do
@@ -14,7 +14,7 @@ defmodule SPE.JobManager do
     server_pid = opts["server_pid"]
 
     {ready, blocked} = split_ready(tasks, %{})
-    Enum.each(ready, fn _ -> send(server_pid, {:there_is_worker, self()}) end)
+    Enum.each(ready, fn _ -> send(server_pid, {:existing_worker, self()}) end)
 
     state = %{
       "job_id" => opts["job_id"],
@@ -31,7 +31,7 @@ defmodule SPE.JobManager do
   end
 
   @impl true
-  def handle_info(:throw_one, state) do
+  def handle_info(:start_one_job, state) do
     [task | rest] = state["queued"]
 
     input =
@@ -72,7 +72,7 @@ defmodule SPE.JobManager do
 
   @impl true
   def handle_info({:task_finished, name, {:result, value}}, state) do
-    send(state["server_pid"], :finished_one)
+    send(state["server_pid"], :finished_one_job)
     job_id = state["job_id"]
 
     Phoenix.PubSub.local_broadcast(
@@ -88,7 +88,7 @@ defmodule SPE.JobManager do
   end
 
   def handle_info({:task_finished, name, {:failed, reason}}, state) do
-    send(state["server_pid"], :finished_one)
+    send(state["server_pid"], :finished_one_job)
     job_id = state["job_id"]
 
     Phoenix.PubSub.local_broadcast(
@@ -151,7 +151,7 @@ defmodule SPE.JobManager do
   defp schedule_new_ready(state) do
     {new_ready, still_blocked} = split_ready(state["blocked"], state["results"])
 
-    Enum.each(new_ready, fn _ -> send(state["server_pid"], {:there_is_worker, self()}) end)
+    Enum.each(new_ready, fn _ -> send(state["server_pid"], {:existing_worker, self()}) end)
 
     %{state | "queued" => state["queued"] ++ new_ready, "blocked" => still_blocked}
   end
