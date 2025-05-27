@@ -97,7 +97,7 @@ defmodule SPE do
   end
 
   @impl true
-  def handle_info(:finished_one_job, state) do
+  def handle_info(:one_job_finished, state) do
     new_state =
       case state["pid_queued_jobs"] do
         [] ->
@@ -110,7 +110,7 @@ defmodule SPE do
     {:noreply, new_state}
   end
 
-  def handle_info({:job_finished, _job_id, _result}, state) do
+  def handle_info({:all_jobs_finished, _job_id, _result}, state) do
     {:noreply, state}
   end
 

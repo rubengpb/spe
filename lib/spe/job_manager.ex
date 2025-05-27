@@ -37,11 +37,8 @@ defmodule SPE.JobManager do
     input =
       Enum.reduce(state["results"], %{}, fn {k, value}, acc ->
         case value do
-          {:result, new_value} ->
-            Map.put(acc, k, new_value)
-
-          _ ->
-            acc
+          {:result, new_value} -> Map.put(acc, k, new_value)
+          _ -> acc
         end
       end)
 
@@ -72,7 +69,7 @@ defmodule SPE.JobManager do
 
   @impl true
   def handle_info({:task_finished, name, {:result, value}}, state) do
-    send(state["server_pid"], :finished_one_job)
+    send(state["server_pid"], :one_job_finished)
     job_id = state["job_id"]
 
     Phoenix.PubSub.local_broadcast(
@@ -88,7 +85,7 @@ defmodule SPE.JobManager do
   end
 
   def handle_info({:task_finished, name, {:failed, reason}}, state) do
-    send(state["server_pid"], :finished_one_job)
+    send(state["server_pid"], :one_job_finished)
     job_id = state["job_id"]
 
     Phoenix.PubSub.local_broadcast(
@@ -126,8 +123,7 @@ defmodule SPE.JobManager do
   end
 
   defp add_result(state, name, result) do
-    %{
-      state
+    %{state
       | "running" => MapSet.delete(state["running"], name),
         "results" => Map.put(state["results"], name, result)
     }
@@ -175,7 +171,7 @@ defmodule SPE.JobManager do
 
   defp maybe_done(%{"blocked" => [], "queued" => [], "running" => running} = state) do
     if MapSet.size(running) == 0 do
-      send(state["server_pid"], {:job_finished, state["job_id"], state["results"]})
+      send(state["server_pid"], {:all_jobs_finished, state["job_id"], state["results"]})
       job_id = state["job_id"]
 
       Phoenix.PubSub.local_broadcast(
