@@ -21,11 +21,11 @@ defmodule SPE do
 
   @impl true
   def init(opts) do
-    max_workers = Keyword.get(opts, :num_workers, :unbounded)
+    num_workers = Keyword.get(opts, :num_workers, :unbounded)
 
     {:ok,
      %{
-       "max_workers" => max_workers,
+       "num_workers" => num_workers,
        "current_workers" => 0,
        "pid_queued_jobs" => [],
        "jobs" => %{},
@@ -97,8 +97,8 @@ defmodule SPE do
   @impl true
   def handle_info({:existing_worker, job_pid}, state) do
     cond do
-      state["current_workers"] < state["max_workers"] ->
-        send(job_pid, :start_one_job)
+      state["current_workers"] < state["num_workers"] ->
+        send(job_pid, :start_one_task)
         {:noreply, Map.update!(state, "current_workers", &(&1 + 1))}
 
       true ->
@@ -108,13 +108,13 @@ defmodule SPE do
   end
 
   @impl true
-  def handle_info(:one_job_finished, state) do
+  def handle_info(:one_task_finished, state) do
     case state["pid_queued_jobs"] do
       [] ->
         {:noreply, Map.update!(state, "current_workers", &(&1 - 1))}
 
       [next_pid | rest] ->
-        send(next_pid, :start_one_job)
+        send(next_pid, :start_one_task)
 
         new_state =
           state
@@ -125,7 +125,7 @@ defmodule SPE do
   end
 
   @impl true
-  def handle_info({:all_jobs_finished, _job_id, _result}, state), do: {:noreply, state}
+  def handle_info({:job_finished, _job_id, _result}, state), do: {:noreply, state}
 
   ## Helpers
 
