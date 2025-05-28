@@ -72,10 +72,6 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
   \titlepage
 \end{frame}
 
-\begin{frame}{Introduction}
-    lksjflkñaj
-\end{frame}
-
 \begin{frame}{Design}
 
 \begin{figure}[H]
@@ -118,11 +114,11 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
         \hline
         \hline
         \hline
-        User & \textbf{SPE} & start \\
-        User & \textbf{SPE} & submit\_job \\
-        User & \textbf{SPE} &  start\_job \\
-        \textbf{SPE} & Task worker & start \\
-        \textbf{SPE} & Job manager &  thow\_one\\
+        Client & \textbf{SPE} & start \\
+        Client & \textbf{SPE} & submit\_job \\
+        Client & \textbf{SPE} &  start\_job \\
+        \textbf{SPE} & Job manager & start \\
+        \textbf{SPE} & Job manager &  start\_one\_task \\
         \hline
         \end{tabular}
     \end{table}
@@ -138,8 +134,8 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
         \hline
         \hline
         \hline
-        \textbf{Job Manager} & SPE & there\_is\_worker \\
-        \textbf{Job Manager} & SPE & finished\_one \\
+        \textbf{Job Manager} & SPE & existing\_worker \\
+        \textbf{Job Manager} & SPE & one\_task\_finished \\
         \textbf{Job Manager} & SPE & job\_finished \\
         \textbf{Job Manager} & Task worker & start \\
         
@@ -165,6 +161,37 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
     \end{table}
 \end{frame}
 
+\begin{frame}{Summary of messages}
+{\color{red} Add cosas in the flechas}
+    \begin{center}
+\begin{tikzpicture}[node distance=2.4cm, auto]
+  \node[draw, circle] (SPE) {SPE};
+  \node[draw, circle, below of=SPE] (JM2) {...};
+  \node[draw, circle, left of=JM2] (JM1) {Job Mg. 1};
+  \node[draw, circle, right of=JM2] (JM3) {Job Mg. n};
+  
+  \node[draw, rectangle, below of=JM1] (TW11) {Task worker};
+  \node[draw, rectangle, right of=TW11] (TW12) {...};
+  \node[draw, rectangle, right of=TW12] (TW13) {...};
+  \node[draw, rectangle, left of=TW11] (TW14) {Task worker};
+
+  \node[draw, rectangle, right of=TW13] (TWn) {Task worker};
+  
+  \draw[->] (SPE) to (JM1) ;
+  \draw[->] (SPE) to (JM2) ;
+  \draw[->] (SPE) to (JM3) ;
+
+  \draw[->] (JM1) to (TW11) ;
+  \draw[->] (JM1) to (TW12) ;
+  \draw[->] (JM3) to (TW13) ;
+  \draw[->] (JM1) to (TW14) ;
+
+  \draw[->] (JM3) to (TWn) ;
+
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
 \begin{frame}{Implementation details}
 
     \begin{table}[]
@@ -186,11 +213,28 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
 
 
 \begin{frame}{State SPE}
-    afsdf
+
+\begin{itemize}
+    \item num\_workers (int)
+    \item current\_workers (int)
+    \item pid\_queued\_jobs (list of PIDs)
+    \item jobs (map)
+    \item next\_unique\_id (int)
+\end{itemize}
+    
 \end{frame}
 
 \begin{frame}{State Job Manager}
-    sdfasfd
+    \begin{itemize}
+        \item job\_id (int)
+        \item name (string)
+        \item server\_pid (PID)
+        \item queued (list of tasks)
+        \item blocked (list of tasks)
+        \item running (map of tasks)
+        \item status (atom)
+        \item results (map of task-results)
+    \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{Task implementation}
@@ -201,6 +245,10 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
             run(name, fun, input, timeout, caller) 
         end
     )
+
+    defp execute_with_timeout(function, input, ms) 
+    defp execute_without_timeout(function, input) 
+    defp safe_execution(function, input)
 \end{lstlisting}
    
 \end{frame}
