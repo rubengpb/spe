@@ -346,7 +346,6 @@ defmodule SPETest do
     Phoenix.PubSub.subscribe(SPE.PubSub, id)
     SPE.start_job(id)
     all_broadcasts = get_all_broadcasts(500)
-    IO.puts("all_broadcasts=#{inspect(all_broadcasts)}")
 
     assert {:failed, %{"t0" => {:failed, :timeout}, "t1" => :not_run}} =
              get_result(id, all_broadcasts)
