@@ -1,4 +1,14 @@
 defmodule SPE.TaskWorker do
+  @moduledoc """
+  Executes a function with optional timeout and reports the result to a caller.
+  """
+
+  @type result ::
+          {:result, any()}
+          | {:failed, :timeout}
+          | {:failed, {:crashed, any()}}
+
+  @spec start_link(any(), (any() -> any()), any(), timeout(), pid()) :: {:ok, pid()}
   def start_link(name, function, input, timeout, caller) do
     Task.start(fn -> run(name, function, input, timeout, caller) end)
   end
@@ -7,7 +17,6 @@ defmodule SPE.TaskWorker do
     result =
       case timeout do
         :infinity -> execute_without_timeout(function, input)
-
         ms when is_integer(ms) -> execute_with_timeout(function, input, ms)
       end
 
@@ -18,8 +27,12 @@ defmodule SPE.TaskWorker do
     task = Task.async(fn -> execute_without_timeout(function, input) end)
 
     case Task.yield(task, ms) do
-      {:ok, result} -> result
-      {:exit, reason} -> {:failed, {:crashed, reason}}
+      {:ok, result} ->
+        result
+
+      {:exit, reason} ->
+        {:failed, {:crashed, reason}}
+
       nil ->
         Task.shutdown(task, :brutal_kill)
         {:failed, :timeout}
@@ -27,18 +40,21 @@ defmodule SPE.TaskWorker do
   end
 
   defp execute_without_timeout(function, input) do
-    id = make_ref()
+    ref_id = make_ref()
     parent = self()
 
-    {pid, ref} =
+    {pid, monitor_ref} =
       spawn_monitor(fn ->
         result = safe_execution(function, input)
-        send(parent, {id, result})
+        send(parent, {ref_id, result})
       end)
 
     receive do
-      {^id, result} -> result
-      {:DOWN, ^ref, :process, ^pid, reason} -> {:failed, {:crashed, reason}}
+      {^ref_id, result} ->
+        result
+
+      {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
+        {:failed, {:crashed, reason}}
     end
   end
 
@@ -46,9 +62,9 @@ defmodule SPE.TaskWorker do
     try do
       {:result, function.(input)}
     rescue
-      e -> {:failed, {:crashed, Exception.message(e)}}
+      exception -> {:failed, {:crashed, Exception.message(exception)}}
     catch
-      _kind, error -> {:failed, {:crashed, error}}
+      kind, reason -> {:failed, {:crashed, {kind, reason}}}
     end
   end
 end
