@@ -6,8 +6,6 @@ defmodule SPE do
   use GenServer
   @name __MODULE__
 
-  ## Public API
-
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: @name)
 
@@ -16,8 +14,6 @@ defmodule SPE do
 
   @spec start_job(String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def start_job(job_id), do: GenServer.call(@name, {:start_job, job_id})
-
-  ## GenServer Callbacks
 
   @impl true
   def init(opts) do
@@ -126,8 +122,6 @@ defmodule SPE do
 
   @impl true
   def handle_info({:job_finished, _job_id, _result}, state), do: {:noreply, state}
-
-  ## Helpers
 
   defp invalid_task?(%{
          "name" => name,

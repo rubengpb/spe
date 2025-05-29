@@ -6,8 +6,6 @@ defmodule SPE.JobManager do
   def get_results(pid), do: GenServer.call(pid, :results)
   def get_tasks(pid), do: GenServer.call(pid, :tasks)
 
-  #def start_one_job(pid), do: send(pid, :start_one_job)
-
   @impl true
   def init(opts) do
     tasks = normalize_tasks(opts["tasks"])
