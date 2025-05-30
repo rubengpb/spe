@@ -162,34 +162,36 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
 \end{frame}
 
 \begin{frame}{Summary of messages}
-{\color{red} Add cosas in the flechas}
-    \begin{center}
-\begin{tikzpicture}[node distance=2.4cm, auto]
+
+\begin{figure}[H]
+\begin{center}
+\begin{tikzpicture}[node distance=2.8cm, auto]
+  
   \node[draw, circle] (SPE) {SPE};
-  \node[draw, circle, below of=SPE] (JM2) {...};
-  \node[draw, circle, left of=JM2] (JM1) {Job Mg. 1};
-  \node[draw, circle, right of=JM2] (JM3) {Job Mg. n};
+  \node[circle, right of=SPE] (aux1) {};
+  \node[circle, right of=aux1] (aux2) {};
+  \node[draw, circle, below of=aux2] (JM) {Job Mg};
   
-  \node[draw, rectangle, below of=JM1] (TW11) {Task worker};
-  \node[draw, rectangle, right of=TW11] (TW12) {...};
-  \node[draw, rectangle, right of=TW12] (TW13) {...};
-  \node[draw, rectangle, left of=TW11] (TW14) {Task worker};
+  \node[circle, right of=JM] (aux3) {};
+  \node[draw, rectangle, above of=aux3] (TW) {Task worker};
 
-  \node[draw, rectangle, right of=TW13] (TWn) {Task worker};
-  
-  \draw[->] (SPE) to (JM1) ;
-  \draw[->] (SPE) to (JM2) ;
-  \draw[->] (SPE) to (JM3) ;
-
-  \draw[->] (JM1) to (TW11) ;
-  \draw[->] (JM1) to (TW12) ;
-  \draw[->] (JM3) to (TW13) ;
-  \draw[->] (JM1) to (TW14) ;
-
-  \draw[->] (JM3) to (TWn) ;
-
+  \pause
+  \draw[->] (SPE) to[bend left=60] node[midway, sloped, above] {start} (JM);
+  \pause
+  \draw[->] (JM) to[bend right=20] node[midway, sloped, above] {existing\_worker} (SPE);
+  \pause
+  \draw[->] (SPE) to[bend left=0] node[midway, sloped, above] {start\_one\_task} (JM);
+  \pause
+  \draw[->] (JM) to[bend left=20] node[midway, sloped, above] {start} (TW);
+  \pause
+  \draw[->] (TW) to[bend left=20] node[midway, sloped, below] {fob\_finished} (JM);
+  \pause
+  \draw[->] (JM) to[bend left=20] node[midway, sloped, below] {one\_task\_finished} (SPE);
+  \pause
+  \draw[->] (JM) to[bend left=60] node[midway, sloped, below] {job\_finished*} (SPE);
 \end{tikzpicture}
 \end{center}
+\end{figure}
 \end{frame}
 
 \begin{frame}{Implementation details}
@@ -210,7 +212,6 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
     \end{table}
     
 \end{frame}
-
 
 \begin{frame}{State SPE}
 
@@ -252,5 +253,4 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
 \end{lstlisting}
    
 \end{frame}
-
 \end{document}
