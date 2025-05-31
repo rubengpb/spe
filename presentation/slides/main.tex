@@ -10,7 +10,7 @@
 
 \title{Programming Scalable Systems}
 \author{
-Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Compta}
+Rubén García-Patos Benito (helarteDeProgrmar)\\[0.5em] Germán Ruiz Cabello (geermanruuiz)\\[0.5em] Alejandro Soriano Compta (Alexsq1)}
 \date{May, 2025}
 
 \begin{document}
@@ -175,7 +175,6 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
   \node[circle, right of=JM] (aux3) {};
   \node[draw, rectangle, above of=aux3] (TW) {Task worker};
 
-  \pause
   \draw[->] (SPE) to[bend left=60] node[midway, sloped, above] {start} (JM);
   \pause
   \draw[->] (JM) to[bend right=20] node[midway, sloped, above] {existing\_worker} (SPE);
@@ -184,7 +183,7 @@ Rubén García-Patos Benito \and Germán Ruiz Cabello \and Alejandro Soriano Com
   \pause
   \draw[->] (JM) to[bend left=20] node[midway, sloped, above] {start} (TW);
   \pause
-  \draw[->] (TW) to[bend left=20] node[midway, sloped, below] {fob\_finished} (JM);
+  \draw[->] (TW) to[bend left=20] node[midway, sloped, below] {task\_finished} (JM);
   \pause
   \draw[->] (JM) to[bend left=20] node[midway, sloped, below] {one\_task\_finished} (SPE);
   \pause
